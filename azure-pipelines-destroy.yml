@@ -1,0 +1,27 @@
+trigger: none
+# - master
+# - azure-pipelines
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- group: dbM-keys
+- group: dbM-secrets
+
+stages:            
+- stage: Destroy_Stage
+  displayName: 'Destroy_Stage'
+  jobs:
+  - job: Destroy_Job
+    displayName: Destroy_Job
+    steps:
+      - bash: |
+          export ARM_TENANT_ID=$(TENANT_ID)
+          export ARM_SUBSCRIPTION_ID=$(SUBSCRIPTION)
+          export ARM_CLIENT_ID=$(CLIENT_ID)
+          export ARM_CLIENT_SECRET=$(clientSecret)
+          sudo wget -q https://github.com/gruntwork-io/terragrunt/releases/download/$(TG_VERSION)/terragrunt_linux_amd64 -O /usr/local/bin/terragrunt && sudo chmod +x /usr/local/bin/terragrunt 
+          [[ $(DEBUG) == "yes" ]] && export debug="--terragrunt-log-level debug"
+          terragrunt run-all destroy --terragrunt-non-interactive -lock=false $debug
+        name: Terragrunt_Destroy

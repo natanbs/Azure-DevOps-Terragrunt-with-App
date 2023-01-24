@@ -1,0 +1,44 @@
+trigger: none
+# - master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- group: dbM-keys
+- group: dbM-secrets
+
+stages:            
+- stage: Application
+  displayName: 'Application'
+  jobs:
+  - job: Ping
+    displayName: 'Install_Ping'
+    steps:
+      - bash: |
+          export ARM_TENANT_ID=$(TENANT_ID)
+          export ARM_SUBSCRIPTION_ID=$(SUBSCRIPTION)
+          export ARM_CLIENT_ID=$(CLIENT_ID)
+          export ARM_CLIENT_SECRET=$(clientSecret)
+          sudo wget -q https://github.com/gruntwork-io/terragrunt/releases/download/$(TG_VERSION)/terragrunt_linux_amd64 -O /usr/local/bin/terragrunt && sudo chmod +x /usr/local/bin/terragrunt 
+          
+          cd env/region/project/instance/infra/vm
+          terragrunt output -raw tls_private_key > /tmp/id_azure_vm
+          chmod 600 /tmp/id_azure_vm
+          vm_ip=`terragrunt output -raw public_ip_address`
+          echo ssh -ti /tmp/id_azure_vm azureuser@${vm_ip}
+          cd -
+          cat <<EOF > install.sh
+          curl -sfL https://get.k3s.io | K3S_KUBECONFIG_MODE='644' sh -
+          echo k3s installed  
+          git clone https://github.com/natanbs/App_DevOps_encapsulation.git
+          cd App_DevOps_encapsulation/v5_kubernate_it
+          ./ping-install.sh
+          EOF
+          echo Install k9s
+          wget -qO- https://github.com/derailed/k9s/releases/download/v0.26.7/k9s_Linux_x86_64.tar.gz | sudo tar zx -C /usr/local/bin
+          echo scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null install.sh -i /tmp/id_azure_vm azureuser@${vm_ip}:/tmp
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/id_azure_vm install.sh azureuser@${vm_ip}:/tmp
+          echo ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -ti /tmp/id_azure_vm azureuser@${vm_ip} "cd /tmp && ./ping-install.sh"
+          ssh -o StrictHostKeyChecking=no -ti /tmp/id_azure_vm azureuser@${vm_ip} "cd /tmp && chmod +x ./install.sh && ./install.sh && exit"
+        displayName: 'Ping Installation'
